@@ -1,0 +1,12 @@
+menu "Example Configuration"
+
+    config EXAMPLE_SSP_ENABLED
+        bool "Enable Secure Simple Pairing (SSP)"
+        default y
+        depends on BT_CLASSIC_ENABLED
+        help
+            This option enables Secure Simple Pairing for Bluetooth Classic connections.
+            When enabled, the device will use "Just Works" mode which doesn't require
+            a PIN code for pairing. This is typically better for HID devices.
+
+endmenu
