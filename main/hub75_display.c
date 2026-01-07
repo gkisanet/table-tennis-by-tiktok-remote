@@ -387,10 +387,10 @@ void hub75_show_winner(int winner_side, bool blink_on, int left_sets,
   hub75_draw_tally(2, 8, 23, winner_side == 0, tally_color);
   hub75_draw_tally(39, 8, 23, winner_side == 1, tally_color);
 
-  // Show final game score (Y=11)
-  draw_score(2, 11, left_score, COLOR_RED);
-  hub75_draw_large_colon(30, 11, COLOR_RED);
-  draw_score(39, 11, right_score, COLOR_RED);
+  // Show final game score (Y=10, same as playing screen)
+  draw_score(2, 10, left_score, COLOR_RED);
+  hub75_draw_large_colon(30, 10, COLOR_RED);
+  draw_score(39, 10, right_score, COLOR_RED);
 
   // "OK" hint at bottom center (blinking)
   if (blink_on) {
