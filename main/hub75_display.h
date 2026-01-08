@@ -178,6 +178,6 @@ void hub75_show_menu(int selection);
  * @param right_sets Right player final sets
  * @param blink_on Blink state
  */
-void hub75_show_match_end(int winner_side, int left_sets, int right_sets, bool blink_on);
+void hub75_show_match_end(int winner_side, int left_sets, int right_sets, bool blink_on, int left_score, int right_score);
 
 #endif // HUB75_DISPLAY_H

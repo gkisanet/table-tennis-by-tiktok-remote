@@ -535,7 +535,8 @@ void ui_task(void *pvParameters) {
 
     case GAME_STATE_MATCH_END:
       hub75_show_match_end(scoreboard.winner_side, scoreboard.left_sets,
-                           scoreboard.right_sets, blink_state);
+                           scoreboard.right_sets, blink_state,
+                           scoreboard.left_score, scoreboard.right_score);
       break;
 
     default:

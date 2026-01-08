@@ -312,17 +312,17 @@ void hub75_show_scoreboard(int left_score, int right_score, int left_sets,
   uint16_t tally_color = COLOR_GREEN;
 
   // Set scores display (top center) - small font
-  char set_str[8];
-  set_str[0] = '0' + left_sets;
-  set_str[1] = ' ';
-  set_str[2] = ':';
-  set_str[3] = ' ';
-  set_str[4] = '0' + right_sets;
-  set_str[5] = '\0';
+  // Draw as separate elements: left set + " : " at X=18, right set 1px left
+  char left_set_str[2] = {'0' + left_sets, '\0'};
+  char right_set_str[2] = {'0' + right_sets, '\0'};
 
   // Draw all elements (blink_on controls visibility in disconnected state)
   if (blink_on) {
-    hub75_draw_text(18, 0, set_str, main_color);
+    hub75_draw_text(22, 0, left_set_str,
+                    main_color);             // Left set (3px before colon)
+    hub75_draw_text(30, 0, ":", main_color); // Colon (aligned with main score)
+    hub75_draw_text(38, 0, right_set_str,
+                    main_color); // Right set (3px after colon)
     hub75_draw_tally(2, 8, 23, serve_side == 0, tally_color);
     hub75_draw_tally(39, 8, 23, serve_side == 1, tally_color);
     // Main scores (Y=10, moved 1px up from 11)
@@ -340,8 +340,10 @@ void hub75_show_scoreboard(int left_score, int right_score, int left_sets,
 void hub75_show_select_first(bool blink_on, int selected_side) {
   hub75_clear();
 
-  // Set scores (0:0 at top)
-  hub75_draw_text(18, 0, "0 : 0", COLOR_RED);
+  // Set scores (0:0 at top) - draw as separate elements
+  hub75_draw_text(22, 0, "0", COLOR_RED); // Left set (3px before colon)
+  hub75_draw_text(30, 0, ":", COLOR_RED); // Colon (aligned with main score)
+  hub75_draw_text(38, 0, "0", COLOR_RED); // Right set (3px after colon)
 
   // Both tally bars blink if no side selected (-1)
   uint16_t left_tally_color = COLOR_BLACK;
@@ -372,15 +374,14 @@ void hub75_show_winner(int winner_side, bool blink_on, int left_sets,
                        int right_sets, int left_score, int right_score) {
   hub75_clear();
 
-  // Set scores (top center)
-  char set_str[8];
-  set_str[0] = '0' + left_sets;
-  set_str[1] = ' ';
-  set_str[2] = ':';
-  set_str[3] = ' ';
-  set_str[4] = '0' + right_sets;
-  set_str[5] = '\0';
-  hub75_draw_text(18, 0, set_str, COLOR_RED);
+  // Set scores (top center) - draw as separate elements
+  char left_set_str[2] = {'0' + left_sets, '\0'};
+  char right_set_str[2] = {'0' + right_sets, '\0'};
+  hub75_draw_text(22, 0, left_set_str,
+                  COLOR_RED);             // Left set (3px before colon)
+  hub75_draw_text(30, 0, ":", COLOR_RED); // Colon (aligned with main score)
+  hub75_draw_text(38, 0, right_set_str,
+                  COLOR_RED); // Right set (3px after colon)
 
   // Blinking tally on winner side only
   uint16_t tally_color = blink_on ? COLOR_GREEN : COLOR_BLACK;
@@ -432,25 +433,33 @@ void hub75_show_menu(int selection) {
 }
 
 void hub75_show_match_end(int winner_side, int left_sets, int right_sets,
-                          bool blink_on) {
+                          bool blink_on, int left_score, int right_score) {
   hub75_clear();
 
-  // Final set scores
-  char set_str[8];
-  set_str[0] = '0' + left_sets;
-  set_str[1] = ' ';
-  set_str[2] = ':';
-  set_str[3] = ' ';
-  set_str[4] = '0' + right_sets;
-  set_str[5] = '\0';
-  hub75_draw_text(18, 0, set_str, COLOR_RED);
+  // Final set scores (top) - draw as separate elements
+  char left_set_str[2] = {'0' + left_sets, '\0'};
+  char right_set_str[2] = {'0' + right_sets, '\0'};
+  hub75_draw_text(22, 0, left_set_str,
+                  COLOR_RED);             // Left set (3px before colon)
+  hub75_draw_text(30, 0, ":", COLOR_RED); // Colon (aligned with main score)
+  hub75_draw_text(38, 0, right_set_str,
+                  COLOR_RED); // Right set (3px after colon)
 
-  // "WIN!" message on winner side (blinking)
+  // Tally bars (winner side lit)
+  hub75_draw_tally(2, 8, 23, winner_side == 0, COLOR_GREEN);
+  hub75_draw_tally(39, 8, 23, winner_side == 1, COLOR_GREEN);
+
+  // Main score (Y=10, same as playing screen)
+  draw_score(2, 10, left_score, COLOR_RED);
+  hub75_draw_large_colon(30, 10, COLOR_RED);
+  draw_score(39, 10, right_score, COLOR_RED);
+
+  // "WIN!" message below winner's score (blinking)
   if (blink_on) {
     if (winner_side == 0) {
-      hub75_draw_text(4, 14, "WIN!", COLOR_GREEN);
+      hub75_draw_text(4, 25, "WIN!", COLOR_GREEN);
     } else {
-      hub75_draw_text(40, 14, "WIN!", COLOR_GREEN);
+      hub75_draw_text(40, 25, "WIN!", COLOR_GREEN);
     }
   }
 }
