@@ -302,8 +302,40 @@ void hub75_show_connecting(void) {
   hub75_draw_text(2, 12, "Connecting..", COLOR_RED);
 }
 
+// Helper to draw a 3x3 circle (filled or outline)
+static void draw_set_circle(int x, int y, int status) {
+  // status: 0=Win(Green), 1=Loss(Red), -1=Unplayed(Dark Outline)
+  if (status == 0) {
+    // Fill Green (3x3)
+    for (int dy = 0; dy < 3; dy++) {
+      for (int dx = 0; dx < 3; dx++) {
+        hub75_set_pixel(x + dx, y + dy, COLOR_GREEN);
+      }
+    }
+  } else if (status == 1) {
+    // Fill Red (3x3)
+    for (int dy = 0; dy < 3; dy++) {
+      for (int dx = 0; dx < 3; dx++) {
+        hub75_set_pixel(x + dx, y + dy, COLOR_PURE_RED);
+      }
+    }
+  } else {
+    // Unplayed: Dark Outline (3x3)
+    // Top & Bottom
+    for (int dx = 0; dx < 3; dx++) {
+      hub75_set_pixel(x + dx, y, COLOR_RED_DARK);
+      hub75_set_pixel(x + dx, y + 2, COLOR_RED_DARK);
+    }
+    // Left & Right (middle)
+    hub75_set_pixel(x, y + 1, COLOR_RED_DARK);
+    hub75_set_pixel(x + 2, y + 1, COLOR_RED_DARK);
+    // Center is empty (black)
+  }
+}
+
 void hub75_show_scoreboard(int left_score, int right_score, int left_sets,
-                           int right_sets, int serve_side, bool blink_on,
+                           int right_sets, const int *set_history,
+                           int total_sets, int serve_side, bool blink_on,
                            bool disconnected) {
   hub75_clear();
 
@@ -311,21 +343,52 @@ void hub75_show_scoreboard(int left_score, int right_score, int left_sets,
   uint16_t main_color = disconnected ? COLOR_PURE_RED : COLOR_RED;
   uint16_t tally_color = COLOR_GREEN;
 
-  // Set scores display (top center) - small font
-  // Draw as separate elements: left set + " : " at X=18, right set 1px left
+  // Set scores display (top center) - Tighter spacing
+  // Colon at X=30. " :" is 5px. Visual colon is usually at index 1 or 2.
+  // We'll draw colon manually or use draw_text.
   char left_set_str[2] = {'0' + left_sets, '\0'};
   char right_set_str[2] = {'0' + right_sets, '\0'};
 
   // Draw all elements (blink_on controls visibility in disconnected state)
   if (blink_on) {
-    hub75_draw_text(22, 0, left_set_str,
-                    main_color);             // Left set (3px before colon)
-    hub75_draw_text(30, 0, ":", main_color); // Colon (aligned with main score)
-    hub75_draw_text(38, 0, right_set_str,
-                    main_color); // Right set (3px after colon)
+    // Layout:
+    // Left Circles: X=2, 6, 10, 14, 18
+    // Left Set: X=23 (ends 27)
+    // Colon: X=30
+    // Right Set: X=36 (ends 40)
+    // Right Circles: X=43, 47, 51, 55, 59
+
+    // Set Scores
+    hub75_draw_text(23, 0, left_set_str, main_color);
+    hub75_draw_text(30, 0, ":", main_color);
+    hub75_draw_text(36, 0, right_set_str, main_color);
+
+    // Set History Circles (Y=2 for alignment with text center)
+    // Left Side History
+    for (int i = 0; i < total_sets; i++) {
+      int x = 2 + (i * 4);
+      int status = -1;
+      if (set_history[i] != -1) {
+        // 0=Left Won (Green for Left), 1=Right Won (Red for Left)
+        status = (set_history[i] == 0) ? 0 : 1;
+      }
+      draw_set_circle(x, 2, status);
+    }
+
+    // Right Side History
+    for (int i = 0; i < total_sets; i++) {
+      int x = 43 + (i * 4);
+      int status = -1;
+      if (set_history[i] != -1) {
+        // 0=Left Won (Red for Right), 1=Right Won (Green for Right)
+        status = (set_history[i] == 1) ? 0 : 1;
+      }
+      draw_set_circle(x, 2, status);
+    }
+
     hub75_draw_tally(2, 8, 23, serve_side == 0, tally_color);
     hub75_draw_tally(39, 8, 23, serve_side == 1, tally_color);
-    // Main scores (Y=10, moved 1px up from 11)
+    // Main scores (Y=10)
     draw_score(2, 10, left_score, main_color);
     hub75_draw_large_colon(30, 10, main_color);
     draw_score(39, 10, right_score, main_color);
@@ -340,10 +403,10 @@ void hub75_show_scoreboard(int left_score, int right_score, int left_sets,
 void hub75_show_select_first(bool blink_on, int selected_side) {
   hub75_clear();
 
-  // Set scores (0:0 at top) - draw as separate elements
-  hub75_draw_text(22, 0, "0", COLOR_RED); // Left set (3px before colon)
-  hub75_draw_text(30, 0, ":", COLOR_RED); // Colon (aligned with main score)
-  hub75_draw_text(38, 0, "0", COLOR_RED); // Right set (3px after colon)
+  // Set scores removed as per user request
+  // hub75_draw_text(22, 0, "0", COLOR_RED);
+  // hub75_draw_text(30, 0, ":", COLOR_RED);
+  // hub75_draw_text(38, 0, "0", COLOR_RED);
 
   // Both tally bars blink if no side selected (-1)
   uint16_t left_tally_color = COLOR_BLACK;
@@ -371,17 +434,40 @@ void hub75_show_select_first(bool blink_on, int selected_side) {
 }
 
 void hub75_show_winner(int winner_side, bool blink_on, int left_sets,
-                       int right_sets, int left_score, int right_score) {
+                       int right_sets, const int *set_history, int total_sets,
+                       int left_score, int right_score) {
   hub75_clear();
 
   // Set scores (top center) - draw as separate elements
   char left_set_str[2] = {'0' + left_sets, '\0'};
   char right_set_str[2] = {'0' + right_sets, '\0'};
-  hub75_draw_text(22, 0, left_set_str,
-                  COLOR_RED);             // Left set (3px before colon)
-  hub75_draw_text(30, 0, ":", COLOR_RED); // Colon (aligned with main score)
-  hub75_draw_text(38, 0, right_set_str,
-                  COLOR_RED); // Right set (3px after colon)
+
+  // Updated Layout matching scoreboard
+  // Left Set: X=23. Colon: X=30. Right Set: X=36.
+  hub75_draw_text(23, 0, left_set_str, COLOR_RED);
+  hub75_draw_text(30, 0, ":", COLOR_RED);
+  hub75_draw_text(36, 0, right_set_str, COLOR_RED);
+
+  // Set History Circles (Y=2)
+  // Left Side History
+  for (int i = 0; i < total_sets; i++) {
+    int x = 2 + (i * 4);
+    int status = -1;
+    if (set_history[i] != -1) {
+      status = (set_history[i] == 0) ? 0 : 1;
+    }
+    draw_set_circle(x, 2, status);
+  }
+
+  // Right Side History
+  for (int i = 0; i < total_sets; i++) {
+    int x = 43 + (i * 4);
+    int status = -1;
+    if (set_history[i] != -1) {
+      status = (set_history[i] == 1) ? 0 : 1;
+    }
+    draw_set_circle(x, 2, status);
+  }
 
   // Blinking tally on winner side only
   uint16_t tally_color = blink_on ? COLOR_GREEN : COLOR_BLACK;
@@ -433,17 +519,39 @@ void hub75_show_menu(int selection) {
 }
 
 void hub75_show_match_end(int winner_side, int left_sets, int right_sets,
-                          bool blink_on, int left_score, int right_score) {
+                          const int *set_history, int total_sets, bool blink_on,
+                          int left_score, int right_score) {
   hub75_clear();
 
-  // Final set scores (top) - draw as separate elements
+  // Final set scores (top)
   char left_set_str[2] = {'0' + left_sets, '\0'};
   char right_set_str[2] = {'0' + right_sets, '\0'};
-  hub75_draw_text(22, 0, left_set_str,
-                  COLOR_RED);             // Left set (3px before colon)
-  hub75_draw_text(30, 0, ":", COLOR_RED); // Colon (aligned with main score)
-  hub75_draw_text(38, 0, right_set_str,
-                  COLOR_RED); // Right set (3px after colon)
+
+  // Updated Layout
+  hub75_draw_text(23, 0, left_set_str, COLOR_RED);
+  hub75_draw_text(30, 0, ":", COLOR_RED);
+  hub75_draw_text(36, 0, right_set_str, COLOR_RED);
+
+  // Set History Circles (Y=2)
+  // Left Side History
+  for (int i = 0; i < total_sets; i++) {
+    int x = 2 + (i * 4);
+    int status = -1;
+    if (set_history[i] != -1) {
+      status = (set_history[i] == 0) ? 0 : 1;
+    }
+    draw_set_circle(x, 2, status);
+  }
+
+  // Right Side History
+  for (int i = 0; i < total_sets; i++) {
+    int x = 43 + (i * 4);
+    int status = -1;
+    if (set_history[i] != -1) {
+      status = (set_history[i] == 1) ? 0 : 1;
+    }
+    draw_set_circle(x, 2, status);
+  }
 
   // Tally bars (winner side lit)
   hub75_draw_tally(2, 8, 23, winner_side == 0, COLOR_GREEN);
@@ -461,5 +569,152 @@ void hub75_show_match_end(int winner_side, int left_sets, int right_sets,
     } else {
       hub75_draw_text(40, 25, "WIN!", COLOR_GREEN);
     }
+  }
+}
+
+void hub75_show_rule_select(bool is_doubles, int sets_to_win, int cursor,
+                            bool blink_on) {
+  hub75_clear();
+
+  // Compact Layout with 3 cursor positions:
+  // cursor=0: Mode row (1:1/2:2)
+  // cursor=1: Sets row (2/3/3/5)
+  // cursor=2: OK button
+  //
+  // Format: "1:1[] 2:2[]" - filled square = selected, blinking = cursor here
+  // 5x7 font: each char is 5px wide + 1px spacing = 6px per char
+
+  // === Mode selection row (Y=2) ===
+  // "1:1" at X=2, then square, then "2:2", then square
+  hub75_draw_text(2, 2, "1:1", COLOR_RED); // X=2, width=18px (3 chars)
+
+  // Square for 1:1 (singles) - at X=21
+  bool singles_selected = !is_doubles;
+  bool singles_blink = (cursor == 0 && singles_selected && blink_on);
+  if (singles_selected && !singles_blink) {
+    // Filled square (3x5) for selected
+    for (int py = 1; py < 6; py++) {
+      for (int px = 0; px < 3; px++) {
+        hub75_set_pixel(21 + px, 2 + py, COLOR_GREEN);
+      }
+    }
+  } else if (!singles_selected) {
+    // Empty square outline for not selected
+    for (int px = 0; px < 3; px++) {
+      hub75_set_pixel(21 + px, 3, COLOR_RED_DARK);
+      hub75_set_pixel(21 + px, 6, COLOR_RED_DARK);
+    }
+    hub75_set_pixel(21, 4, COLOR_RED_DARK);
+    hub75_set_pixel(21, 5, COLOR_RED_DARK);
+    hub75_set_pixel(23, 4, COLOR_RED_DARK);
+    hub75_set_pixel(23, 5, COLOR_RED_DARK);
+  }
+
+  hub75_draw_text(27, 2, "2:2", COLOR_RED); // X=27, width=18px
+
+  // Square for 2:2 (doubles) - at X=46
+  bool doubles_selected = is_doubles;
+  bool doubles_blink = (cursor == 0 && doubles_selected && blink_on);
+  if (doubles_selected && !doubles_blink) {
+    for (int py = 1; py < 6; py++) {
+      for (int px = 0; px < 3; px++) {
+        hub75_set_pixel(46 + px, 2 + py, COLOR_GREEN);
+      }
+    }
+  } else if (!doubles_selected) {
+    for (int px = 0; px < 3; px++) {
+      hub75_set_pixel(46 + px, 3, COLOR_RED_DARK);
+      hub75_set_pixel(46 + px, 6, COLOR_RED_DARK);
+    }
+    hub75_set_pixel(46, 4, COLOR_RED_DARK);
+    hub75_set_pixel(46, 5, COLOR_RED_DARK);
+    hub75_set_pixel(48, 4, COLOR_RED_DARK);
+    hub75_set_pixel(48, 5, COLOR_RED_DARK);
+  }
+
+  // Current row indicator (cursor == 0)
+  if (cursor == 0 && blink_on) {
+    hub75_draw_text(52, 2, "<-", COLOR_PURE_RED);
+  }
+
+  // === Separator line (Y=11) ===
+  for (int i = 0; i < 60; i++) {
+    hub75_set_pixel(2 + i, 11, COLOR_RED_DARK);
+  }
+
+  // === Sets selection row (Y=14) ===
+  hub75_draw_text(2, 14, "2/3", COLOR_RED); // Best of 3
+
+  // Square for 2/3 - at X=21
+  bool bo3_selected = (sets_to_win == 2);
+  bool bo3_blink = (cursor == 1 && bo3_selected && blink_on);
+  if (bo3_selected && !bo3_blink) {
+    for (int py = 1; py < 6; py++) {
+      for (int px = 0; px < 3; px++) {
+        hub75_set_pixel(21 + px, 14 + py, COLOR_GREEN);
+      }
+    }
+  } else if (!bo3_selected) {
+    for (int px = 0; px < 3; px++) {
+      hub75_set_pixel(21 + px, 15, COLOR_RED_DARK);
+      hub75_set_pixel(21 + px, 18, COLOR_RED_DARK);
+    }
+    hub75_set_pixel(21, 16, COLOR_RED_DARK);
+    hub75_set_pixel(21, 17, COLOR_RED_DARK);
+    hub75_set_pixel(23, 16, COLOR_RED_DARK);
+    hub75_set_pixel(23, 17, COLOR_RED_DARK);
+  }
+
+  hub75_draw_text(27, 14, "3/5", COLOR_RED); // Best of 5
+
+  // Square for 3/5 - at X=46
+  bool bo5_selected = (sets_to_win == 3);
+  bool bo5_blink = (cursor == 1 && bo5_selected && blink_on);
+  if (bo5_selected && !bo5_blink) {
+    for (int py = 1; py < 6; py++) {
+      for (int px = 0; px < 3; px++) {
+        hub75_set_pixel(46 + px, 14 + py, COLOR_GREEN);
+      }
+    }
+  } else if (!bo5_selected) {
+    for (int px = 0; px < 3; px++) {
+      hub75_set_pixel(46 + px, 15, COLOR_RED_DARK);
+      hub75_set_pixel(46 + px, 18, COLOR_RED_DARK);
+    }
+    hub75_set_pixel(46, 16, COLOR_RED_DARK);
+    hub75_set_pixel(46, 17, COLOR_RED_DARK);
+    hub75_set_pixel(48, 16, COLOR_RED_DARK);
+    hub75_set_pixel(48, 17, COLOR_RED_DARK);
+  }
+
+  // Current row indicator (cursor == 1)
+  if (cursor == 1 && blink_on) {
+    hub75_draw_text(52, 14, "<-", COLOR_PURE_RED);
+  }
+
+  // === OK button row (Y=24) ===
+  if (cursor == 2) {
+    // OK is selected - blink
+    if (blink_on) {
+      hub75_draw_text(26, 24, "OK", COLOR_GREEN);
+    }
+  } else {
+    // OK not selected - dim
+    hub75_draw_text(26, 24, "OK", COLOR_RED_DARK);
+  }
+}
+
+void hub75_show_court_change(bool blink_on) {
+  hub75_clear();
+
+  // "CHANGE" centered
+  hub75_draw_text(11, 6, "CHANGE", COLOR_RED);
+
+  // "COURT" centered below
+  hub75_draw_text(14, 14, "COURT", COLOR_RED);
+
+  // "OK" hint at bottom (blinking)
+  if (blink_on) {
+    hub75_draw_text(26, 24, "OK", COLOR_GREEN);
   }
 }

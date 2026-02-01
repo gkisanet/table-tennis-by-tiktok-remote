@@ -133,12 +133,15 @@ void hub75_show_connecting(void);
  * @param right_score Right player score (0-99)
  * @param left_sets Left player sets won
  * @param right_sets Right player sets won
+ * @param set_history Array of set winners (0=left, 1=right, -1=none)
+ * @param total_sets Total number of sets (3 or 5)
  * @param serve_side Current server (0=left, 1=right, -1=none)
  * @param blink_on Blink state (true = visible, for disconnected blinking)
  * @param disconnected true = disconnected state (pure red color)
  */
 void hub75_show_scoreboard(int left_score, int right_score, 
                            int left_sets, int right_sets,
+                           const int *set_history, int total_sets,
                            int serve_side, bool blink_on, bool disconnected);
 
 /**
@@ -158,6 +161,7 @@ void hub75_show_select_first(bool blink_on, int selected_side);
  * @param right_score Final right score
  */
 void hub75_show_winner(int winner_side, bool blink_on, int left_sets, int right_sets,
+                       const int *set_history, int total_sets,
                        int left_score, int right_score);
 
 /**
@@ -178,6 +182,23 @@ void hub75_show_menu(int selection);
  * @param right_sets Right player final sets
  * @param blink_on Blink state
  */
-void hub75_show_match_end(int winner_side, int left_sets, int right_sets, bool blink_on, int left_score, int right_score);
+void hub75_show_match_end(int winner_side, int left_sets, int right_sets,
+                          const int *set_history, int total_sets,
+                          bool blink_on, int left_score, int right_score);
+
+/**
+ * @brief Display rule selection screen
+ * @param is_doubles true=doubles(2:2), false=singles(1:1)
+ * @param sets_to_win 2 for best of 3, 3 for best of 5
+ * @param cursor 0=mode row, 1=sets row
+ * @param blink_on Blink state for cursor
+ */
+void hub75_show_rule_select(bool is_doubles, int sets_to_win, int cursor, bool blink_on);
+
+/**
+ * @brief Display court change notification
+ * @param blink_on Blink state for OK hint
+ */
+void hub75_show_court_change(bool blink_on);
 
 #endif // HUB75_DISPLAY_H

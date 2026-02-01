@@ -97,6 +97,64 @@ static void process_button(button_event_t btn) {
   ESP_LOGI(TAG, "Processing button: %d in state: %d", btn, scoreboard.state);
 
   switch (scoreboard.state) {
+  case GAME_STATE_RULE_SELECT:
+    // 3-position cursor: 0=mode, 1=sets, 2=OK
+    if (btn == BTN_UP) {
+      // Move cursor up (wraps around)
+      if (scoreboard.rule_cursor > 0) {
+        scoreboard.rule_cursor--;
+      } else {
+        scoreboard.rule_cursor = 2; // Wrap to OK
+      }
+      ESP_LOGI(TAG, "Rule cursor: %d", scoreboard.rule_cursor);
+    } else if (btn == BTN_DOWN) {
+      // Move cursor down (wraps around)
+      if (scoreboard.rule_cursor < 2) {
+        scoreboard.rule_cursor++;
+      } else {
+        scoreboard.rule_cursor = 0; // Wrap to mode
+      }
+      ESP_LOGI(TAG, "Rule cursor: %d", scoreboard.rule_cursor);
+    } else if (btn == BTN_LEFT || btn == BTN_RIGHT) {
+      // Toggle the current option (only for mode and sets rows)
+      if (scoreboard.rule_cursor == 0) {
+        // Toggle singles/doubles
+        scoreboard.is_doubles = !scoreboard.is_doubles;
+        ESP_LOGI(TAG, "Mode: %s",
+                 scoreboard.is_doubles ? "Doubles" : "Singles");
+      } else if (scoreboard.rule_cursor == 1) {
+        // Toggle best of 3 / best of 5
+        if (scoreboard.sets_to_win == 2) {
+          scoreboard.sets_to_win = 3;
+          scoreboard.total_sets = 5;
+        } else {
+          scoreboard.sets_to_win = 2;
+          scoreboard.total_sets = 3;
+        }
+        ESP_LOGI(TAG, "Sets: Best of %d", scoreboard.total_sets);
+      }
+      // No action for LEFT/RIGHT when on OK button
+    } else if (btn == BTN_CENTER) {
+      // OK button - advance to next setting or confirm
+      if (scoreboard.rule_cursor == 0) {
+        // On mode row -> move to sets row
+        scoreboard.rule_cursor = 1;
+        ESP_LOGI(TAG, "Mode selected, moving to sets");
+      } else if (scoreboard.rule_cursor == 1) {
+        // On sets row -> move to OK
+        scoreboard.rule_cursor = 2;
+        ESP_LOGI(TAG, "Sets selected, moving to OK");
+      } else {
+        // On OK -> confirm and proceed to SELECT_FIRST
+        scoreboard.state = GAME_STATE_SELECT_FIRST;
+        scoreboard.rule_cursor = 0; // Reset for next time
+        ESP_LOGI(TAG, "Rules confirmed: %s, Best of %d",
+                 scoreboard.is_doubles ? "Doubles" : "Singles",
+                 scoreboard.total_sets);
+      }
+    }
+    break;
+
   case GAME_STATE_SELECT_FIRST:
     if (btn == BTN_LEFT) {
       scoreboard.serve_side = 0;
@@ -180,24 +238,39 @@ static void process_button(button_event_t btn) {
   case GAME_STATE_WINNER:
     if (btn == BTN_CENTER) {
       // Next set - players swap sides (court change)
-      // Swap set scores (because left player is now on right, and vice versa)
-      int temp_sets = scoreboard.left_sets;
-      scoreboard.left_sets = scoreboard.right_sets;
-      scoreboard.right_sets = temp_sets;
+      // Next set - players swap sides (court change)
+      // Use helper to swap everything (sets, history, serve_side)
+      scoreboard_swap_sides(&scoreboard);
 
-      // Reset game scores
+      // Reset game scores for new set
       scoreboard.left_score = 0;
       scoreboard.right_score = 0;
       scoreboard.undo_count = MAX_UNDO;
       scoreboard.history_index = 0;
       scoreboard.winner_side = -1;
 
-      // Serve starts from the same side as first set (first_serve_side
-      // unchanged)
-      scoreboard.serve_side = scoreboard.first_serve_side;
+      // New set configuration
+      scoreboard.court_changed =
+          false; // Reset flag (swap_sides sets it to true)
+
+      // Serve always starts from Left side in new set (after swapping sides)
+      scoreboard.serve_side = 0;
+      scoreboard.first_serve_side = 0;
+
       scoreboard.state = GAME_STATE_PLAYING;
       ESP_LOGI(TAG, "Next set started, sides swapped, serve: %d",
                scoreboard.serve_side);
+    }
+    break;
+
+  case GAME_STATE_COURT_CHANGE:
+    if (btn == BTN_CENTER) {
+      // Swap sides and continue playing
+      scoreboard_swap_sides(&scoreboard);
+      scoreboard.state = GAME_STATE_PLAYING;
+      ESP_LOGI(TAG, "Court change: scores swapped. L:%d-%d R:%d-%d",
+               scoreboard.left_score, scoreboard.right_score,
+               scoreboard.left_sets, scoreboard.right_sets);
     }
     break;
 
@@ -232,15 +305,15 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id,
 
         // Update game state
         if (scoreboard.state == GAME_STATE_CONNECTING) {
-          scoreboard.state = GAME_STATE_SELECT_FIRST;
+          scoreboard.state = GAME_STATE_RULE_SELECT;
         } else if (scoreboard.state == GAME_STATE_DISCONNECTED) {
           // Reconnected - restore to previous meaningful state (PLAYING or
-          // SELECT_FIRST)
+          // RULE_SELECT)
           if (scoreboard.left_score > 0 || scoreboard.right_score > 0 ||
               scoreboard.left_sets > 0 || scoreboard.right_sets > 0) {
             scoreboard.state = GAME_STATE_PLAYING;
           } else {
-            scoreboard.state = GAME_STATE_SELECT_FIRST;
+            scoreboard.state = GAME_STATE_RULE_SELECT;
           }
         }
       }
@@ -503,19 +576,27 @@ void ui_task(void *pvParameters) {
       hub75_set_brightness(10);
       hub75_show_scoreboard(scoreboard.left_score, scoreboard.right_score,
                             scoreboard.left_sets, scoreboard.right_sets,
+                            scoreboard.set_history, scoreboard.total_sets,
                             scoreboard.serve_side, blink_state, true);
       break;
 
+    case GAME_STATE_RULE_SELECT:
+      hub75_set_brightness(40);
+      hub75_show_rule_select(scoreboard.is_doubles, scoreboard.sets_to_win,
+                             scoreboard.rule_cursor, blink_state);
+      break;
+
     case GAME_STATE_SELECT_FIRST:
-      hub75_set_brightness(20);
+      hub75_set_brightness(40);
       hub75_show_select_first(blink_state, -1);
       break;
 
     case GAME_STATE_PLAYING:
-      // Normal play: 20% brightness, always visible (pass true)
-      hub75_set_brightness(20);
+      // Normal play: 30% brightness, always visible (pass true)
+      hub75_set_brightness(40);
       hub75_show_scoreboard(scoreboard.left_score, scoreboard.right_score,
                             scoreboard.left_sets, scoreboard.right_sets,
+                            scoreboard.set_history, scoreboard.total_sets,
                             scoreboard.serve_side, true, false);
       break;
 
@@ -530,13 +611,20 @@ void ui_task(void *pvParameters) {
     case GAME_STATE_WINNER:
       hub75_show_winner(scoreboard.winner_side, blink_state,
                         scoreboard.left_sets, scoreboard.right_sets,
+                        scoreboard.set_history, scoreboard.total_sets,
                         scoreboard.left_score, scoreboard.right_score);
       break;
 
     case GAME_STATE_MATCH_END:
       hub75_show_match_end(scoreboard.winner_side, scoreboard.left_sets,
-                           scoreboard.right_sets, blink_state,
+                           scoreboard.right_sets, scoreboard.set_history,
+                           scoreboard.total_sets, blink_state,
                            scoreboard.left_score, scoreboard.right_score);
+      break;
+
+    case GAME_STATE_COURT_CHANGE:
+      hub75_set_brightness(40);
+      hub75_show_court_change(blink_state);
       break;
 
     default:
