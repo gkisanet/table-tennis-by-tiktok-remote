@@ -1,3 +1,4 @@
+[![영상 제목](http://img.youtube.com/vi/zOHwlgsSIXo/0.jpg)](https://www.youtube.com/watch?v=zOHwlgsSIXo)
 # 🏓 탁구 전자 점수판 (Table Tennis Digital Scoreboard)
 
 ESP32와 P5 LED 모듈을 사용한 블루투스 탁구 전자 점수판입니다.  
