@@ -1,7 +1,15 @@
 # 🏓 탁구 전자 점수판 (Table Tennis Digital Scoreboard)
 
 ESP32와 P5 LED 모듈을 사용한 블루투스 탁구 전자 점수판입니다.  
-TikTok 블루투스 리모컨(Beauty-R1)으로 점수를 조작할 수 있습니다.
+TikTok 블루투스 리모컨으로 점수를 조작할 수 있습니다.
+
+## 🔀 브랜치 안내
+
+| 브랜치 | MCU | 통신 | 리모컨 |
+|--------|-----|------|--------|
+| **`main`** (현재) | ESP32 | Bluetooth Classic | Beauty-R1 |
+| [`classic-bt`](https://github.com/gkisanet/table-tennis-by-tiktok-remote/tree/classic-bt) | ESP32 | Bluetooth Classic | Beauty-R1 |
+| [`ble`](https://github.com/gkisanet/table-tennis-by-tiktok-remote/tree/ble) | ESP32-S3 | BLE | JX-05 |
 
 ---
 
@@ -207,6 +215,39 @@ LEFT/RIGHT 버튼으로 먼저 서브할 플레이어를 선택합니다.
 - 선수들이 코트를 교체합니다
 - 세트 점수가 좌/우로 바뀝니다
 - 서브권은 최초 선택한 위치에서 시작
+
+---
+
+## ⚠️ 사용 전 필수 설정: 리모컨 MAC 주소
+
+> [!CAUTION]
+> 이 프로젝트를 사용하려면 **본인의 TikTok 리모컨 MAC 주소**를 코드에 직접 입력해야 합니다.
+
+### 1단계: 리모컨 MAC 주소 확인
+
+리모컨의 MAC 주소를 모르는 경우, 먼저 코드를 빌드하여 ESP32에 플래시하세요.  
+시리얼 모니터에서 스캔된 블루투스 장치 목록이 표시됩니다:
+
+```
+BT : 12:22:34:01:00:c0, RSSI: -45, USAGE: GENERIC, NAME: Beauty-R1
+```
+
+여기서 `12:22:34:01:00:c0`이 리모컨의 MAC 주소입니다.
+
+### 2단계: 코드에 MAC 주소 입력
+
+`main/main.c` 파일에서 아래 부분을 **본인의 리모컨 MAC 주소**로 변경하세요:
+
+```c
+// main/main.c (36번째 줄)
+static const uint8_t TARGET_MAC[6] = {0x12, 0x22, 0x34, 0x01, 0x00, 0xc0};
+//                                     ↑ 이 값들을 본인의 MAC 주소로 변경!
+```
+
+예를 들어, MAC 주소가 `AA:BB:CC:DD:EE:FF`라면:
+```c
+static const uint8_t TARGET_MAC[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+```
 
 ---
 
