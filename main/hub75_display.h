@@ -14,22 +14,22 @@
 #define PANEL_WIDTH 64
 #define PANEL_HEIGHT 32
 
-// HUB75 GPIO Pin mapping (user-defined)
-#define PIN_R1 25
-#define PIN_G1 26
-#define PIN_B1 27
-#define PIN_R2 14
-#define PIN_G2 12
-#define PIN_B2 13
+// HUB75 GPIO Pin mapping (ESP32-S3용)
+#define PIN_R1 4
+#define PIN_G1 5
+#define PIN_B1 6
+#define PIN_R2 7
+#define PIN_G2 15
+#define PIN_B2 16
 
-#define PIN_A 23
-#define PIN_B 22
-#define PIN_C 5
-#define PIN_D 17
+#define PIN_A 18
+#define PIN_B 8
+#define PIN_C 3
+#define PIN_D 46
 
-#define PIN_CLK 16
-#define PIN_LAT 4
-#define PIN_OE 15
+#define PIN_CLK 9
+#define PIN_LAT 10
+#define PIN_OE 11
 
 // Color definitions (RGB565 format)
 // Orange (R+G) for main scores - better visibility and power efficiency

@@ -1,3 +1,10 @@
-idf_component_register(SRCS "scoreboard.c" "hub75_display.c" "main.c" "esp_hid_gap.c"
-                    PRIV_REQUIRES bt nvs_flash esp_hid driver esp_timer
-                    INCLUDE_DIRS ".")
+set(srcs "esp_hid_host_main.c"
+         "esp_hid_gap.c"
+         "hub75_display.c"
+         "scoreboard.c")
+set(include_dirs ".")
+
+idf_component_register(SRCS "${srcs}"
+                       INCLUDE_DIRS "${include_dirs}"
+                       REQUIRES esp_hid driver
+                       PRIV_REQUIRES nvs_flash)
